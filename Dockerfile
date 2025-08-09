@@ -7,8 +7,8 @@ WORKDIR /app
 # Копируем только файлы, необходимые для установки зависимостей
 COPY package.json package-lock.json ./
 
-# Устанавливаем только production-зависимости (без devDependencies)
-RUN npm ci --only=production
+# Устанавливаем зависимости
+RUN npm install
 
 # Копируем остальные файлы проекта
 COPY . .
@@ -26,6 +26,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/config.json ./
 
 # Задаем переменные окружения во время сборки
 ARG GITLAB_HOST
