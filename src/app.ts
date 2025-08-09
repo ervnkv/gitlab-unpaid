@@ -5,12 +5,13 @@ import { GitLabClient } from './gitlab';
 import { HandlerManager } from './handlers';
 import { WebhookService } from './webhooks';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const GITLAB_HOST = process.env.GITLAB_HOST || 'https://gitlab.com';
 const GITLAB_PRIVATE_TOKEN = process.env.GITLAB_PRIVATE_TOKEN;
 const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3000', 10);
 const WEBHOOK_SECRET_TOKEN = process.env.WEBHOOK_SECRET_TOKEN;
+const CONFIG_URL = process.env.CONFIG_URL;
 
 // Checks for required environment variables
 if (!GITLAB_PRIVATE_TOKEN) {
@@ -23,8 +24,13 @@ if (!WEBHOOK_SECRET_TOKEN) {
   process.exit();
 }
 
+if (!CONFIG_URL) {
+  console.error('⚠️\tError: env CONFIG_URL does not provide');
+  process.exit();
+}
+
 // Initialize the configuration manager
-const configManager = new ConfigManager('config.json');
+const configManager = new ConfigManager(CONFIG_URL);
 
 // Initialize the GitLab client
 const gitlabClient = new GitLabClient(GITLAB_HOST, GITLAB_PRIVATE_TOKEN);
@@ -40,7 +46,7 @@ const webhookService = new WebhookService(
 );
 
 async function run() {
-  const [configError] = configManager.setConfig();
+  const [configError] = await configManager.setConfig();
 
   if (configError) {
     console.error(`⚠️\tError: cannot set config:`, configError.text);

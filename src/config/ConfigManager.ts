@@ -1,24 +1,21 @@
-import fs from 'fs';
-import path from 'path';
+import fetch from 'node-fetch';
 
 import { BotConfig, WithErr, ProjectConfig, BotConfigSchema } from '../types';
 import { err, withErr } from '../utils';
 
 export class ConfigManager {
   private config: BotConfig | null = null;
-  private configPath: string;
 
-  constructor(configFileName: string) {
-    this.configPath = path.resolve(process.cwd(), configFileName);
-  }
+  constructor(private url: string) {}
 
-  public setConfig(): WithErr<true> {
-    const [rawConfigError, rawConfig] = withErr(() => {
-      return JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
+  public async setConfig(): Promise<WithErr<true>> {
+    const [rawConfigError, rawConfig] = await withErr(async () => {
+      const response = await fetch(this.url);
+      return await response.json();
     });
 
     if (rawConfigError) {
-      return [err('Cannot read config.json')];
+      return [err('Cannot read config.json from URL')];
     }
 
     const [configError, config] = withErr(() =>
