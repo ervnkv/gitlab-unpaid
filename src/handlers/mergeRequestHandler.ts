@@ -23,8 +23,6 @@ export async function mergeRequestHandler(
   const approvalsConfig = projectConfig.approvals_config;
 
   if (approvalsConfig) {
-    const isPushEvent = event.object_attributes.action === 'update';
-
     const [authorError, author] =
       await gitlabClient.getMergeRequestAuthorUsername({
         projectId,
@@ -47,7 +45,7 @@ export async function mergeRequestHandler(
 
     // Check approvals
     const [approvalsRuleError] = await approvalsRule({
-      approvers: isPushEvent ? [] : approvers,
+      approvers,
       author,
       config: approvalsConfig,
       gitlabClient,

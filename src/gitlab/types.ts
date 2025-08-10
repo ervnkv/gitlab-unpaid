@@ -1,3 +1,8 @@
+export type GetCommitMergeRequests = {
+  projectId: number;
+  commitId: string;
+};
+
 export type GetMergeRequestCommitsMessages = {
   projectId: number;
   mergeRequestId: number;

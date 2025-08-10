@@ -5,6 +5,7 @@ import { withErr } from '../utils';
 
 import { emojiHandler } from './emojiHandler';
 import { mergeRequestHandler } from './mergeRequestHandler';
+import { pushHandler } from './pushHandler';
 
 export class HandlerManager {
   constructor(
@@ -32,6 +33,14 @@ export class HandlerManager {
           'Error in merge request event handler: ',
           mergeRequestHandlerError.text,
         );
+      }
+    } else if (event.object_kind === 'push') {
+      const [pushHandlerError] = await withErr(() =>
+        pushHandler(this.gitlabClient, this.configManager, event),
+      );
+
+      if (pushHandlerError) {
+        console.error('Error in push event handler: ', pushHandlerError.text);
       }
     }
   };

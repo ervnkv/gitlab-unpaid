@@ -1,6 +1,6 @@
 import { Gitlab } from '@gitbeaker/rest';
 
-import { Thread, User, WithErr } from '../types';
+import { MergeRequest, Thread, User, WithErr } from '../types';
 import { err, withErr } from '../utils';
 
 import {
@@ -8,6 +8,7 @@ import {
   FindBotThread,
   GetMergeRequestApproversUsernames,
   GetMergeRequestAuthorUsername,
+  GetCommitMergeRequests,
   UpsertThread,
 } from './types';
 
@@ -21,6 +22,24 @@ export class GitLabClient {
       token: privateToken,
       camelize: true,
     });
+  }
+
+  /**
+   * Method to get commits messages from a Merge Request
+   */
+  public async getCommitMergeRequests({
+    projectId,
+    commitId,
+  }: GetCommitMergeRequests): Promise<WithErr<MergeRequest[]>> {
+    const [mergeRequestsDataError, mergeRequestsData] = await withErr(() =>
+      this.api.Commits.allMergeRequests(projectId, commitId),
+    );
+
+    if (mergeRequestsDataError) {
+      return [err("Cannot get commit's merge requests")];
+    }
+
+    return [null, mergeRequestsData];
   }
 
   /**
