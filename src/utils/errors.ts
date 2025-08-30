@@ -1,10 +1,7 @@
 import { WithErr } from '../types';
 
-export function withErr<T>(
-  func: () => Promise<T>,
-  test?: string,
-): Promise<WithErr<T>>;
-export function withErr<T>(func: () => T, test?: string): WithErr<T>;
+export function withErr<T>(func: () => Promise<T>): Promise<WithErr<T>>;
+export function withErr<T>(func: () => T): WithErr<T>;
 export function withErr<T>(
   func: (() => T) | (() => Promise<T>),
 ): Promise<WithErr<T>> | WithErr<T> {

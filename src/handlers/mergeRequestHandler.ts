@@ -2,12 +2,15 @@ import { ConfigManager } from '../config';
 import { GitLabClient } from '../gitlab';
 import { approvalsRule, namingRule } from '../rules';
 import { EventMergeRequest, WithErr } from '../types';
+import { logger } from '../utils';
 
 export async function mergeRequestHandler(
   gitlabClient: GitLabClient,
   configManager: ConfigManager,
   event: EventMergeRequest,
 ): Promise<WithErr<true>> {
+  logger('started', 'mergeRequest handler');
+
   // Get required info
   const projectId = event.project.id;
   const projectPath = event.project.path_with_namespace;
@@ -22,7 +25,14 @@ export async function mergeRequestHandler(
 
   const approvalsConfig = projectConfig.approvals_config;
 
+  // logger(
+  //   'approvalsConfig: ' + JSON.stringify(approvalsConfig, null, 2),
+  //   'mergeRequest handler',
+  // );
+
   if (approvalsConfig) {
+    logger('approvalsRule started', 'mergeRequest handler');
+
     const [authorError, author] =
       await gitlabClient.getMergeRequestAuthorUsername({
         projectId,
@@ -33,6 +43,8 @@ export async function mergeRequestHandler(
       return [authorError];
     }
 
+    logger('author: ' + author, 'mergeRequest handler');
+
     const [approversError, approvers] =
       await gitlabClient.getMergeRequestApproversUsernames({
         projectId,
@@ -42,6 +54,8 @@ export async function mergeRequestHandler(
     if (approversError) {
       return [approversError];
     }
+
+    logger('approvers: ' + approvers, 'mergeRequest handler');
 
     // Check approvals
     const [approvalsRuleError] = await approvalsRule({
@@ -56,11 +70,20 @@ export async function mergeRequestHandler(
     if (approvalsRuleError) {
       return [approvalsRuleError];
     }
+
+    logger('approvalsRule ended', 'mergeRequest handler');
   }
 
   const namingConfig = projectConfig.naming_config;
 
+  logger(
+    'namingConfig: ' + JSON.stringify(namingConfig, null, 2),
+    'mergeRequest handler',
+  );
+
   if (namingConfig) {
+    logger('namingRule started', 'mergeRequest handler');
+
     const mergeRequestTitle = event.object_attributes.title;
     const branch = event.object_attributes.source_branch;
 
@@ -73,6 +96,8 @@ export async function mergeRequestHandler(
     if (commitsError) {
       return [commitsError];
     }
+
+    logger('commits: ' + commits, 'mergeRequest handler');
 
     // Check naming
     const [namingRuleError] = await namingRule({
@@ -88,7 +113,11 @@ export async function mergeRequestHandler(
     if (namingRuleError) {
       return [namingRuleError];
     }
+
+    logger('namingRule ended', 'mergeRequest handler');
   }
+
+  logger('succeed', 'mergeRequest handler');
 
   return [null, true];
 }

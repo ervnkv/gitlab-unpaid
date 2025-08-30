@@ -1,7 +1,7 @@
 import { ConfigManager } from '../config';
 import { GitLabClient } from '../gitlab';
 import { GitlabEvent } from '../types';
-import { withErr } from '../utils';
+import { logger, withErr } from '../utils';
 
 import { emojiHandler } from './emojiHandler';
 import { mergeRequestHandler } from './mergeRequestHandler';
@@ -13,15 +13,17 @@ export class HandlerManager {
     private configManager: ConfigManager,
   ) {}
 
+  // TODO Добавить ивент note чтобы запретить резолвить тред
   public handleEvent = async (event: GitlabEvent) => {
+    logger(event.object_kind, 'handler manager');
+
     if (event.object_kind === 'emoji') {
-      const [emojiHandlerError] = await withErr(
-        () => emojiHandler(this.gitlabClient, this.configManager, event),
-        'emojiHandler',
+      const [emojiHandlerError] = await withErr(() =>
+        emojiHandler(this.gitlabClient, this.configManager, event),
       );
 
       if (emojiHandlerError) {
-        console.error('Error in emoji event handler: ', emojiHandlerError.text);
+        logger(emojiHandlerError.text, 'handler manager', 'error');
       }
     } else if (event.object_kind === 'merge_request') {
       const [mergeRequestHandlerError] = await withErr(() =>
@@ -29,10 +31,7 @@ export class HandlerManager {
       );
 
       if (mergeRequestHandlerError) {
-        console.error(
-          'Error in merge request event handler: ',
-          mergeRequestHandlerError.text,
-        );
+        logger(mergeRequestHandlerError.text, 'handler manager', 'error');
       }
     } else if (event.object_kind === 'push') {
       const [pushHandlerError] = await withErr(() =>
@@ -40,7 +39,7 @@ export class HandlerManager {
       );
 
       if (pushHandlerError) {
-        console.error('Error in push event handler: ', pushHandlerError.text);
+        logger(pushHandlerError.text, 'handler manager', 'error');
       }
     }
   };

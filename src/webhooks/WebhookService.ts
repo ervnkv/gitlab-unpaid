@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 
 import { GitlabEvent, WithErr } from '../types';
-import { err, withErr } from '../utils';
+import { err, logger, withErr } from '../utils';
 
 export class WebhookService {
   private app: express.Application;
@@ -33,6 +33,8 @@ export class WebhookService {
         }
 
         const event: GitlabEvent = req.body;
+
+        logger(JSON.stringify(event, null, 2), 'webhook event');
 
         await this.eventEmitter(event);
 

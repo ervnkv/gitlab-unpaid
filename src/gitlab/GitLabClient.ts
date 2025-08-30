@@ -1,7 +1,7 @@
 import { Gitlab } from '@gitbeaker/rest';
 
 import { MergeRequest, Thread, User, WithErr } from '../types';
-import { err, withErr } from '../utils';
+import { err, logger, withErr } from '../utils';
 
 import {
   GetMergeRequestCommitsMessages,
@@ -31,6 +31,8 @@ export class GitLabClient {
     projectId,
     commitId,
   }: GetCommitMergeRequests): Promise<WithErr<MergeRequest[]>> {
+    logger('started', 'getCommitMergeRequests');
+
     const [mergeRequestsDataError, mergeRequestsData] = await withErr(() =>
       this.api.Commits.allMergeRequests(projectId, commitId),
     );
@@ -38,6 +40,8 @@ export class GitLabClient {
     if (mergeRequestsDataError) {
       return [err("Cannot get commit's merge requests")];
     }
+
+    logger('succeed', 'getCommitMergeRequests');
 
     return [null, mergeRequestsData];
   }
@@ -49,6 +53,8 @@ export class GitLabClient {
     projectId,
     mergeRequestId,
   }: GetMergeRequestCommitsMessages): Promise<WithErr<string[]>> {
+    logger('started', 'getMergeRequestCommitsMessages');
+
     const [commitsDataError, commitsData] = await withErr(() =>
       this.api.MergeRequests.allCommits(projectId, mergeRequestId),
     );
@@ -65,6 +71,8 @@ export class GitLabClient {
       return [err('Cannot get commits messages')];
     }
 
+    logger('succeed', 'getMergeRequestCommitsMessages');
+
     return [null, commits];
   }
 
@@ -75,6 +83,8 @@ export class GitLabClient {
     projectId,
     mergeRequestId,
   }: GetMergeRequestAuthorUsername): Promise<WithErr<string>> {
+    logger('started', 'getMergeRequestAuthorUsername');
+
     const [mergeRequestDataError, mergeRequestData] = await withErr(() =>
       this.api.MergeRequests.show(projectId, mergeRequestId),
     );
@@ -91,6 +101,8 @@ export class GitLabClient {
       return [err('Cannot get author username')];
     }
 
+    logger('succeed', 'getMergeRequestAuthorUsername');
+
     return [null, authorUsername];
   }
 
@@ -101,6 +113,8 @@ export class GitLabClient {
     projectId,
     mergeRequestId,
   }: GetMergeRequestApproversUsernames): Promise<WithErr<string[]>> {
+    logger('started', 'getMergeRequestApproversUsernames');
+
     const [emojiDataError, emojiData] = await withErr(() =>
       this.api.MergeRequestAwardEmojis.all(projectId, mergeRequestId),
     );
@@ -119,6 +133,8 @@ export class GitLabClient {
       return [err('Cannot get emoji usernames')];
     }
 
+    logger('succeed', 'getMergeRequestApproversUsernames');
+
     return [null, approversUsernames];
   }
 
@@ -130,6 +146,8 @@ export class GitLabClient {
     mergeRequestId,
     identifier,
   }: FindBotThread): Promise<WithErr<Thread | null>> {
+    logger('started', 'findBotThread');
+
     const [discussionsError, discussionsData] = await withErr(() =>
       this.api.MergeRequestDiscussions.all(projectId, mergeRequestId),
     );
@@ -163,6 +181,8 @@ export class GitLabClient {
       return [err('Cannot get thread')];
     }
 
+    logger('succeed', 'findBotThread');
+
     return [null, thread ?? null];
   }
 
@@ -177,45 +197,131 @@ export class GitLabClient {
     noteId,
     resolved,
   }: UpsertThread): Promise<WithErr<true>> {
+    logger(
+      'started, ' +
+        JSON.stringify(
+          {
+            projectId,
+            mergeRequestId,
+            body,
+            discussionId,
+            noteId,
+            resolved,
+          },
+          null,
+          2,
+        ),
+      'updateTread',
+    );
+
+    logger('isExist: ' + Boolean(discussionId && noteId), 'updateTread');
+
+    // Редактируем существующий тред
     if (discussionId && noteId) {
-      const [editExistThreadError] = await withErr(() =>
-        this.api.MergeRequestDiscussions.editNote(
+      const [discussionsError, discussionData] = await withErr(() =>
+        this.api.MergeRequestDiscussions.show(
           projectId,
           mergeRequestId,
           discussionId,
-          noteId,
-          { body },
         ),
       );
 
-      if (editExistThreadError) {
-        return [err('Cannot edit existing thread')];
+      if (discussionsError) {
+        return [err('Cannot get existing thread discussion')];
       }
 
-      const [resolveExistThreadError] = await withErr(() =>
-        this.api.MergeRequestDiscussions.editNote(
-          projectId,
-          mergeRequestId,
-          discussionId,
-          noteId,
-          { resolved },
-        ),
+      logger(
+        'discussionData: ' + JSON.stringify(discussionData, null, 2),
+        'updateTread',
       );
 
-      if (resolveExistThreadError) {
-        return [err('Cannot resolve existing thread')];
+      const notes = Array.isArray(discussionData.notes)
+        ? discussionData.notes
+        : [];
+      const note = notes.find(({ id }) => id === noteId);
+
+      if (!note) {
+        return [err('Cannot get existing thread note')];
+      }
+
+      logger('note: ' + JSON.stringify(note, null, 2), 'updateTread');
+
+      if (note.body.trim() !== body.trim()) {
+        logger('edit body', 'updateTread');
+
+        const [editExistThreadBodyError] = await withErr(() =>
+          this.api.MergeRequestDiscussions.editNote(
+            projectId,
+            mergeRequestId,
+            discussionId,
+            noteId,
+            { body },
+          ),
+        );
+
+        if (editExistThreadBodyError) {
+          return [err('Cannot edit existing thread')];
+        }
+      }
+
+      if (note.resolved !== resolved) {
+        logger('edit resolve', 'updateTread');
+
+        const [resolveExistThreadError] = await withErr(() =>
+          this.api.MergeRequestDiscussions.editNote(
+            projectId,
+            mergeRequestId,
+            discussionId,
+            noteId,
+            { resolved },
+          ),
+        );
+
+        if (resolveExistThreadError) {
+          return [err('Cannot resolve existing thread')];
+        }
       }
 
       return [null, true];
     }
 
-    const [newDiscussionError] = await withErr(() =>
+    // Создаем новый тред
+    const [newDiscussionError, newDiscussionData] = await withErr(() =>
       this.api.MergeRequestDiscussions.create(projectId, mergeRequestId, body),
     );
 
     if (newDiscussionError) {
       return [err('Cannot create new thread')];
     }
+
+    const notes = Array.isArray(newDiscussionData.notes)
+      ? newDiscussionData.notes
+      : [];
+    const note = notes[0];
+
+    if (!note) {
+      return [err('Cannot get new thread note')];
+    }
+
+    if (note.resolved !== resolved) {
+      logger('edit resolve new thread', 'updateTread');
+
+      const [resolveExistThreadError] = await withErr(() =>
+        this.api.MergeRequestDiscussions.editNote(
+          projectId,
+          mergeRequestId,
+          newDiscussionData.id,
+          note.id,
+          { resolved },
+        ),
+      );
+
+      if (resolveExistThreadError) {
+        return [err('Cannot resolve new thread')];
+      }
+    }
+
+    logger('succeed', 'updateTread');
 
     return [null, true];
   }

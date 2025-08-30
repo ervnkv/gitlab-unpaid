@@ -2,13 +2,15 @@ import { ConfigManager } from '../config';
 import { GitLabClient } from '../gitlab';
 import { approvalsRule } from '../rules';
 import { EventEmoji, WithErr } from '../types';
-import { err } from '../utils';
+import { err, logger } from '../utils';
 
 export async function emojiHandler(
   gitlabClient: GitLabClient,
   configManager: ConfigManager,
   event: EventEmoji,
 ): Promise<WithErr<true>> {
+  logger('started', 'emoji handler');
+
   // Get required info
   const projectId = event.project.id;
   const projectPath = event.project.path_with_namespace;
@@ -25,6 +27,11 @@ export async function emojiHandler(
     return [err('Cannot get approvals rules from config')];
   }
 
+  logger(
+    'approvalsConfig: ' + JSON.stringify(approvalsConfig, null, 2),
+    'emoji handler',
+  );
+
   const isMergeRequest =
     event.object_attributes.awardable_type === 'MergeRequest';
 
@@ -33,6 +40,8 @@ export async function emojiHandler(
   }
 
   const mergeRequestId = event.merge_request.iid;
+
+  logger('mergeRequestId: ' + mergeRequestId, 'emoji handler');
 
   const [approversError, approvers] =
     await gitlabClient.getMergeRequestApproversUsernames({
@@ -44,6 +53,8 @@ export async function emojiHandler(
     return [approversError];
   }
 
+  logger('approvers: ' + approvers, 'emoji handler');
+
   const [authorError, author] =
     await gitlabClient.getMergeRequestAuthorUsername({
       projectId,
@@ -53,6 +64,8 @@ export async function emojiHandler(
   if (authorError) {
     return [authorError];
   }
+
+  logger('author: ' + author, 'emoji handler');
 
   // Check approvals
   const [approvalsRuleError] = await approvalsRule({
@@ -67,6 +80,8 @@ export async function emojiHandler(
   if (approvalsRuleError) {
     return [approvalsRuleError];
   }
+
+  logger('succeed', 'emoji handler');
 
   return [null, true];
 }

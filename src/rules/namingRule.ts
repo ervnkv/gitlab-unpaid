@@ -1,5 +1,6 @@
 import { GitLabClient } from '../gitlab';
 import { NamingConfig, WithErr } from '../types';
+import { logger } from '../utils';
 
 type NamingRule = {
   mergeRequestTitle: string;
@@ -20,8 +21,10 @@ export async function namingRule({
   projectId,
   mergeRequestId,
 }: NamingRule): Promise<WithErr<true>> {
+  logger('started', 'naming rule');
+
   // Check naming
-  let body = `${config.identifier}\n\n`;
+  let body = `${config.identifier}`;
   let rulesMessage = ``;
 
   let allRulesValid = true;
@@ -32,7 +35,7 @@ export async function namingRule({
     const mrTitleRegex = new RegExp(mrTitleRule.pattern);
     const isMrTitleValid = mrTitleRegex.test(mergeRequestTitle);
     if (!isMrTitleValid) allRulesValid = false;
-    rulesMessage += `${isMrTitleValid ? ':white_check_mark:' : ':x:'} ${mrTitleRule.name} ${mrTitleRule.pattern}\n\n`;
+    rulesMessage += `\n\n${isMrTitleValid ? ':white_check_mark:' : ':x:'} ${mrTitleRule.name} ${mrTitleRule.pattern}`;
   }
 
   // Check branch name
@@ -41,7 +44,7 @@ export async function namingRule({
     const branchRegex = new RegExp(branchRule.pattern);
     const isBranchValid = branchRegex.test(branch);
     if (!isBranchValid) allRulesValid = false;
-    rulesMessage += `${isBranchValid ? ':white_check_mark:' : ':x:'} ${branchRule.name} ${branchRule.pattern}\n\n`;
+    rulesMessage += `\n\n${isBranchValid ? ':white_check_mark:' : ':x:'} ${branchRule.name} ${branchRule.pattern}`;
   }
 
   // Check commit messages
@@ -50,15 +53,17 @@ export async function namingRule({
     const commitsRegex = new RegExp(commitsRule.pattern);
     commits.forEach((commit) => {
       const isCommitsValid = commitsRegex.test(commit);
-      rulesMessage += `${isCommitsValid ? ':white_check_mark:' : ':x:'} ${commitsRule.name} ${commitsRule.pattern}\n\n`;
+      rulesMessage += `\n\n${isCommitsValid ? ':white_check_mark:' : ':x:'} ${commitsRule.name} ${commitsRule.pattern}`;
       if (!isCommitsValid) allRulesValid = false;
     });
   }
 
+  logger('allRulesValid: ' + allRulesValid, 'naming rule');
+
   if (allRulesValid) {
-    body += `${config.success}\n\n`;
+    body += `\n\n${config.success}`;
   } else {
-    body += `${config.failed}\n\n`;
+    body += `\n\n${config.failed}`;
   }
 
   body += rulesMessage;
@@ -74,6 +79,8 @@ export async function namingRule({
     return [botThreadError];
   }
 
+  logger('botThread: ' + JSON.stringify(botThread, null, 2), 'naming rule');
+
   const [updateTreadError] = await gitlabClient.updateTread({
     projectId,
     mergeRequestId,
@@ -86,6 +93,8 @@ export async function namingRule({
   if (updateTreadError) {
     return [updateTreadError];
   }
+
+  logger('succeed', 'naming rule');
 
   return [null, true];
 }

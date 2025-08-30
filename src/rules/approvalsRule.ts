@@ -1,5 +1,6 @@
 import { GitLabClient } from '../gitlab';
 import { ApprovalsConfig, WithErr } from '../types';
+import { logger } from '../utils';
 
 type ApprovalsRule = {
   approvers: string[];
@@ -18,8 +19,10 @@ export async function approvalsRule({
   projectId,
   mergeRequestId,
 }: ApprovalsRule): Promise<WithErr<true>> {
+  logger('started', 'approvals rule');
+
   // Check approvals
-  let body = `${config.identifier}\n\n`;
+  let body = `${config.identifier}`;
 
   const requiredApproversCount = config.required_count;
   const allowedApprovers = config.allowed_approvers.filter(
@@ -39,14 +42,19 @@ export async function approvalsRule({
     currentApproversCount >= requiredApproversCount;
 
   if (isMergeRequestApproved) {
-    body += `${config.success}\n\n`;
+    body += `\n\n${config.success}`;
   } else {
-    body += `${config.failed}\n\n`;
+    body += `\n\n${config.failed}`;
   }
 
   allowedApproversMap.forEach(({ username, approved }) => {
-    body += `${approved ? ':white_check_mark:' : ':x:'}  @${username}\n\n`;
+    body += `\n\n${approved ? ':white_check_mark:' : ':x:'}  @${username}`;
   });
+
+  logger(
+    'allowedApproversMap: ' + JSON.stringify(allowedApproversMap, null, 2),
+    'approvals rule',
+  );
 
   // Update bot thread
   const [botThreadError, botThread] = await gitlabClient.findBotThread({
@@ -58,6 +66,8 @@ export async function approvalsRule({
   if (botThreadError) {
     return [botThreadError];
   }
+
+  logger('botThread: ' + JSON.stringify(botThread, null, 2), 'approvals rule');
 
   const [updateTreadError] = await gitlabClient.updateTread({
     projectId,
@@ -71,6 +81,8 @@ export async function approvalsRule({
   if (updateTreadError) {
     return [updateTreadError];
   }
+
+  logger('succeed', 'approvals rule');
 
   return [null, true];
 }
